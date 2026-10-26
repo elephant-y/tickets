@@ -1,0 +1,17 @@
+spring:
+     application:
+       name: ticket-server   # 服务名,注册中心的 key
+     cloud:
+       nacos:
+         discovery:
+           server-addr: localhost:8848
+     datasource:
+         url: jdbc:mysql://localhost:3307/ticket?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+         username: root
+         password: 123456 
+ticket:
+  jwt:
+    secret: ticket-12306-jwt-secret-key-2026-pls-change-me
+    expire-hours: 2     
+  snowflake:
+    worker-id: 1

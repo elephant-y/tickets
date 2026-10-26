@@ -1,0 +1,19 @@
+server:
+  port: 8081   # 网关端口(与 ticket-server 的 8080 错开)
+
+spring:
+  application:
+    name: ticket-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+    gateway:
+      routes:
+        - id: ticket-server-route      # 路由 id,任意字符串,唯一即可
+          uri: lb://ticket-server      # lb = 客户端负载均衡,按服务名向 Nacos 要实例列表
+          predicates:
+            - Path=/api/**             # 断言:/api 开头的请求走这条路由
+ticket:
+  jwt:
+    secret: ticket-12306-jwt-secret-key-2026-pls-change-me

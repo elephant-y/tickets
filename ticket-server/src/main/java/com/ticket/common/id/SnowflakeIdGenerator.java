@@ -1,6 +1,9 @@
 package com.ticket.common.id;
 
+
 import java.util.function.LongSupplier;
+
+
 
 public class SnowflakeIdGenerator {
     public static final long EPOCH = 1767225600000L;
