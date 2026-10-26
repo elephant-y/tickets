@@ -1,0 +1,18 @@
+package com.ticket;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+/**
+ * 购票系统启动类。
+ *
+ * 阶段一~四:单体应用 —— 先纵后横,在单体里跑通「查询→下单→扣库存→支付」主链路,
+ * 亲身体会直接查库/行锁的瓶颈之后,阶段五起再拆微服务、上消息队列。
+ */
+@SpringBootApplication
+public class TicketApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(TicketApplication.class, args);
+    }
+}

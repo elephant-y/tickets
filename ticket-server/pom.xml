@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      Spring Boot 3.2.5 + JDK 17:
+      为什么锁这个组合?阶段二引入 Spring Cloud Alibaba 2023.0.1.0(Nacos/Sentinel/Seata),
+      它官方配套 Spring Cloud 2023.0.1 / Boot 3.2.x —— 这是目前资料最多、踩坑最少的组合。
+      Boot 3.2 官方支持 JDK 17~21,不支持更新的 JDK(见项目 README/文档说明)。
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.ticket</groupId>
+    <artifactId>ticket-server</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>ticket-server</name>
+    <description>12306 式购票系统后端(单体起步,先纵后横,阶段五后拆微服务)</description>
+
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+
+    <dependencies>
+        <!-- Web:阶段二起的 REST 接口都基于它(内嵌 Tomcat) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- 测试:JUnit5 + AssertJ + Mockito 全家桶 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
