@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -27,6 +28,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<?>> handleBiz(BizException e) {
         return ResponseEntity.status(e.getCode())
                 .body(Result.error(e.getCode(), e.getMessage()));
+    }
+
+    /** 缺必填参数:属于调用方的错,400 而不是 500 */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Result<?>> handleMissingParam(MissingServletRequestParameterException e) {
+        return ResponseEntity.status(400)
+                .body(Result.error(400, "缺少参数: " + e.getParameterName()));
     }
 
     /** 唯一键冲突兜底:即使某个 Service 忘了捕获 DuplicateKeyException,也不会返回 500 */

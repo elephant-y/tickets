@@ -105,6 +105,16 @@
             <version>0.12.6</version>
             <scope>runtime</scope>
         </dependency>
+        <!-- Redis:阶段三多级缓存的中间层(默认客户端 Lettuce,基于 Netty 异步) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <!-- Caffeine:本地缓存(第一级,纳秒级命中) -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

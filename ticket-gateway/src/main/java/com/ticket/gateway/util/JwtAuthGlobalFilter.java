@@ -20,18 +20,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import reactor.core.publisher.Mono;
 
-/**
- * JWT 全局鉴权过滤器:除白名单外,所有请求必须携带合法 token 才能继续。
- *
- * <p>为什么写在网关:鉴权是横切关注点,收口一处(见 docs/03 §2.2.1);
- * 业务服务不写任何鉴权代码,只信任网关注入的 X-User-Id 头。
- *
- * <p>为什么实现 GlobalFilter 而不是路由级 Filter:所有路由都要过,一处生效。
- * order = -100:保证在路由匹配/转发之前执行(内置转发过滤器的 order 都是万级)。
- *
- * <p>安全要点:注入 X-User-Id 用 header() 的覆盖语义 ——
- * 客户端伪造的同名头会被验签得到的 uid 覆盖,伪造无效。
- */
+
 @Component
 public class JwtAuthGlobalFilter implements GlobalFilter, Ordered {
 
