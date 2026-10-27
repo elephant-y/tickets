@@ -103,6 +103,16 @@ public class StockCache {
             return data;
         }
     }
+    /** 主动失效(变更驱动):下单扣减后调用 —— 本地 + Redis 双删,读路径下次查询拿新值 */
+    public void invalidate(String key) {
+        local.invalidate(key);
+        try {
+            redis.delete(key);
+        } catch (Exception e) {
+            log.error("Redis 删除缓存失败: {}", key, e);
+        }
+    }
+
     private void asyncRebuild(String key, Supplier<List<StockInfoResponse>> loader) {
     // putIfAbsent 返回 null = 黑板上之前没人 = 我抢到了重建权(原子操作)
     if (rebuilding.putIfAbsent(key, Boolean.TRUE) == null) {
