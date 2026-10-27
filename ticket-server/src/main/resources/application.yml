@@ -13,6 +13,8 @@ spring:
       redis:
         host: localhost
         port: 6379
+        timeout: 500ms          # 命令超时:Redis 挂了快速失败,降级立刻生效(默认 60s 会拖死所有请求)
+        connect-timeout: 500ms  # 连接建立超时
 
 ticket:
   jwt:
@@ -21,6 +23,7 @@ ticket:
   snowflake:
     worker-id: 1
   cache:
-    stock-ttl-seconds: 30      # 余票缓存基础 TTL
-    null-ttl-seconds: 60       # 空值缓存 TTL(防穿透)
+    stock-ttl-seconds: 30      # 本地缓存基础 TTL
+    null-ttl-seconds: 60       # 空值标记 TTL(防穿透)
+    redis-ttl-seconds: 120     # Redis 层 TTL(共享层,比本地长:多留一会减少跨实例重复回源)
     local-max-size: 1000       # 本地缓存最大条数

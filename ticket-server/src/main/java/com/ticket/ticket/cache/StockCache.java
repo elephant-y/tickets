@@ -1,5 +1,6 @@
 package com.ticket.ticket.cache;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -7,9 +8,13 @@ import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.ticket.ticket.dto.StockInfoResponse;
@@ -28,10 +33,17 @@ public class StockCache {
     @Value("${ticket.cache.null-ttl-seconds:60}")
     private int nullTtlSeconds;
 
+    /** Redis 层 TTL(秒):共享层,比本地长 —— 多留一会,跨实例/跨重启的重复回源就少 */
+    @Value("${ticket.cache.redis-ttl-seconds:120}")
+    private int redisTtlSeconds;
     // ① 本地缓存:Caffeine,只设容量上限,不设过期(过期由 expireAt 承载)
     private final Cache<String, CacheEntry> local =
         Caffeine.newBuilder().maximumSize(1000).build();
     private final ConcurrentHashMap<String, Boolean> rebuilding = new ConcurrentHashMap<>();
+    @Autowired
+    private StringRedisTemplate redis;
+    @Autowired
+    private ObjectMapper objectMapper;  
 
     // ② 缓存条目:data + empty(空值标记)+ expireAt(逻辑过期时间)
     private static class CacheEntry {
@@ -66,10 +78,28 @@ public class StockCache {
         }
         else
         {
-            // 命运A:缓存里没有 —— 同步查库(第一次查,无旧值可垫,必须等这一次)
+            try {
+                String cached = redis.opsForValue().get(key);
+                if("NULL".equals(cached))
+                {
+                    put(key,List.of());
+                    log.info("Redis 命中空标记: {}", key);
+                    return List.of();
+                }
+                if(cached!=null)
+                {
+                    List<StockInfoResponse> data =
+                    objectMapper.readValue(cached, new TypeReference<List<StockInfoResponse>>() {});
+                    put(key,data);
+                    log.info("Redis 命中: {}", key);
+                    return data;
+                }
+            } catch (Exception e) {
+               log.error("Redis 异常,降级直查库: {}", key, e);
+            }
             List<StockInfoResponse> data = loader.get();
-            put(key, data);          // 回填(空列表也会被缓存,put 里处理 empty 标记)
-            log.info("回源 DB,回填缓存: {}", key);
+            put(key, data); 
+            putRedis(key, data);
             return data;
         }
     }
@@ -78,7 +108,10 @@ public class StockCache {
     if (rebuilding.putIfAbsent(key, Boolean.TRUE) == null) {
         CompletableFuture.runAsync(() -> {
             try {
-                put(key, loader.get());        // 查库 + 回填
+                List<StockInfoResponse> fresh = loader.get();
+                put(key, fresh);
+                putRedis(key, fresh);          // ← 重建的新数据也要进共享层,其他实例才看得到
+
             } catch (Exception e) {
                log.error("缓存重建失败: {}", key, e);   // 异步异常必须接住,否则静默丢失
             } finally {
@@ -89,14 +122,23 @@ public class StockCache {
     // 没抢到:什么都不做 —— 别人正在重建,我直接返回旧值
     }
     private void put(String key, List<StockInfoResponse> data) {
-    boolean empty = data.isEmpty();
-    // 空标记用短 TTL(60s),正常数据用基础 TTL(30s)
-    int ttlSeconds = empty ? nullTtlSeconds : stockTtlSeconds;
-    // ±10% 随机扰动(防雪崩):每个 key 的失效时刻打散
-    long jitter = (long) (ttlSeconds * 1000L * (0.9 + Math.random() * 0.2));
-    local.put(key, new CacheEntry(data, empty, System.currentTimeMillis() + jitter));
-}
-
+        boolean empty = data.isEmpty();
+        // 空标记用短 TTL(60s),正常数据用基础 TTL(30s)
+        int ttlSeconds = empty ? nullTtlSeconds : stockTtlSeconds;
+        // ±10% 随机扰动(防雪崩):每个 key 的失效时刻打散
+        long jitter = (long) (ttlSeconds * 1000L * (0.9 + Math.random() * 0.2));
+        local.put(key, new CacheEntry(data, empty, System.currentTimeMillis() + jitter));
+    }
+    private void putRedis(String key,List<StockInfoResponse> data)
+    {
+        try {
+            String value = data.isEmpty() ? "NULL" : objectMapper.writeValueAsString(data);
+            long ttl = (long) (redisTtlSeconds * (0.9 + Math.random() * 0.2));
+            redis.opsForValue().set(key, value, Duration.ofSeconds(ttl));
+        } catch (Exception e) {
+            log.error("Redis 回填失败: {}", key, e);
+        }
+    }
     // ④ 回填:empty 决定 TTL(空值用短 TTL),expireAt 加 ±10% 随机扰动
     // ⑤ 异步重建:CompletableFuture.runAsync + ConcurrentHashMap 标记「该 key 正在重建」,
     //    防止过期瞬间 1000 个请求同时查库(重建单飞)
