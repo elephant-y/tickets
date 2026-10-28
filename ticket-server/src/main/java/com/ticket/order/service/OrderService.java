@@ -20,14 +20,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticket.common.exception.BizException;
 import com.ticket.order.dto.CreateOrderRequest;
 import com.ticket.order.dto.CreateOrderRequest.Passenger;
+import com.ticket.order.dto.OrderMessage;
 import com.ticket.order.entity.Order;
 import com.ticket.order.entity.OrderItem;
+import com.ticket.order.entity.OrderRequest;
 import com.ticket.order.entity.SeatHold;
 import com.ticket.order.mapper.OrderItemMapper;
 import com.ticket.order.mapper.OrderMapper;
+import com.ticket.order.mapper.OrderRequestMapper;
 import com.ticket.order.mapper.SeatHoldMapper;
 import com.ticket.ticket.cache.StockCache;
 import com.ticket.ticket.entity.TrainSeatStock;
@@ -35,6 +39,7 @@ import com.ticket.ticket.mapper.TrainSeatStockMapper;
 import com.ticket.train.entity.TrainStation;
 import com.ticket.train.mapper.TrainMapper;
 import com.ticket.train.mapper.TrainStationMapper;
+import org.apache.rocketmq.spring.core.RocketMQTemplate;
 
 @Service
 public class OrderService {
@@ -46,6 +51,10 @@ public class OrderService {
     private final TrainSeatStockMapper trainSeatStockMapper;
     private final TrainStationMapper trainStationMapper;
     private final TrainMapper trainMapper;
+    private final OrderRequestMapper orderRequestMapper;
+    private final ObjectMapper objectMapper;
+    @Autowired 
+    private RocketMQTemplate rocketMQTemplate;
     @Autowired
     private StringRedisTemplate redis;
     private final StockCache stockCache;
@@ -59,7 +68,7 @@ public class OrderService {
     }
     @Autowired 
     private TransactionTemplate transactionTemplate;
-    public OrderService(SeatHoldMapper seatHoldMapper,OrderMapper orderMapper,OrderItemMapper orderItemMapper,TrainSeatStockMapper trainSeatStockMapper,TrainStationMapper trainStationMapper,TrainMapper trainMapper,StockCache stockCache)
+    public OrderService(SeatHoldMapper seatHoldMapper,OrderMapper orderMapper,OrderItemMapper orderItemMapper,TrainSeatStockMapper trainSeatStockMapper,TrainStationMapper trainStationMapper,TrainMapper trainMapper,StockCache stockCache,OrderRequestMapper orderRequestMapper,ObjectMapper objectMapper)
     {
         this.seatHoldMapper=seatHoldMapper;
         this.orderMapper=orderMapper;
@@ -68,10 +77,30 @@ public class OrderService {
         this.trainStationMapper=trainStationMapper;
         this.trainMapper=trainMapper;
         this.stockCache=stockCache;
+        this.orderRequestMapper=orderRequestMapper;
+        this.objectMapper=objectMapper;
     }
-    public Long createOrder(CreateOrderRequest req,Long userId)
+    public String createOrder(CreateOrderRequest req,Long userId) 
     {
         validate(req);
+        String requestId = generateOrderNo();
+        OrderRequest record=new OrderRequest();
+        record.setRequestId(requestId);
+        record.setUserId(userId);
+        try {
+            record.setPayload(objectMapper.writeValueAsString(req));
+        } catch (Exception e) {
+            log.error("下单请求序列化失败", e);
+            throw new BizException(500, "下单失败,请重试");
+        }  // 原始请求序列化
+        record.setStatus(0);
+        orderRequestMapper.insert(record);
+        rocketMQTemplate.convertAndSend("ORDER_CREATE",
+            new OrderMessage(requestId, userId, req));
+        return requestId;
+    }
+    public Long executeOrder(CreateOrderRequest req, Long userId) 
+    {
         int fromNo = resolveStationNo(req.getTrainId(), req.getFromStationId());
         int toNo   = resolveStationNo(req.getTrainId(), req.getToStationId());
         List<Long> holdIds=holdSeats(req);
@@ -93,7 +122,7 @@ public class OrderService {
         // ⑥ 建订单 + 明细(编程式事务只包这一步)
             Long orderId = saveOrderAndItems(req, userId, fromNo, toNo, holdIds, intervals, trainNo, amount);
 
-        // ⑦ 失效余票缓存(本地 + Redis)
+        // ⑦ 删除余票缓存(本地 + Redis)
             invalidateCache(req);
             return orderId;
         } catch (Exception e) {

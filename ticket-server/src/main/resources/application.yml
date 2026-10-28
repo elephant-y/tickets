@@ -27,3 +27,8 @@ ticket:
     null-ttl-seconds: 60       # 空值标记 TTL(防穿透)
     redis-ttl-seconds: 120     # Redis 层 TTL(共享层,比本地长:多留一会减少跨实例重复回源)
     local-max-size: 1000       # 本地缓存最大条数
+
+rocketmq:
+  name-server: localhost:19876   # NameServer(9876 撞 Windows 排除段,容器映射到 19876)
+  producer:
+    group: ticket-producer       # 生产者组名(任意唯一字符串)
