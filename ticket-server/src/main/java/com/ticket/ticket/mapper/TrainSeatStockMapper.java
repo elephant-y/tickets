@@ -3,6 +3,7 @@ package com.ticket.ticket.mapper;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -45,4 +46,41 @@ public interface TrainSeatStockMapper extends BaseMapper<TrainSeatStock>{
                    @Param("fromNo") int fromNo,
                    @Param("toNo") int toNo,
                    @Param("count") int count);
+
+    /**
+     * DB 兜底回减(updateSold 的镜像,取消/退票时调用)。
+     * WHERE 带 sold_seat >= count 防负数:回减量永远不该超过已扣量,超了就说明数据坏了,拒改。
+     */
+    @Update("""
+            UPDATE train_seat_stock
+            SET sold_seat = sold_seat - #{count}, version = version + 1
+            WHERE train_id = #{trainId} AND train_date = #{trainDate}
+              AND seat_type_id = #{seatTypeId}
+              AND from_station_no = #{fromNo} AND to_station_no = #{toNo}
+              AND sold_seat >= #{count}
+            """)
+    int decreaseSold(@Param("trainId") Long trainId,
+                     @Param("trainDate") LocalDate trainDate,
+                     @Param("seatTypeId") Long seatTypeId,
+                     @Param("fromNo") int fromNo,
+                     @Param("toNo") int toNo,
+                     @Param("count") int count);
+
+    /**
+     * 库存续期:为指定日期生成全部「车次 × 区间 × 座位类型」的库存行(与 init-data.sql 同源)。
+     * 返回生成行数。id 用 UUID_SHORT 占位(纯 SQL 环境无应用雪花,初始化语义同种子数据)。
+     */
+    @Insert("""
+            INSERT INTO train_seat_stock
+              (id, train_id, train_date, seat_type_id, from_station_no, to_station_no,
+               total_seat, sold_seat, version)
+            SELECT UUID_SHORT(), ts1.train_id, #{date}, st.id, ts1.station_no, ts2.station_no,
+                   CASE st.id WHEN 11 THEN 100 WHEN 12 THEN 24 WHEN 13 THEN 12 END,
+                   0, 0
+            FROM train_station ts1
+            JOIN train_station ts2
+              ON ts1.train_id = ts2.train_id AND ts1.station_no < ts2.station_no
+            CROSS JOIN seat_type st
+            """)
+    int renewStockForDate(@Param("date") LocalDate date);
 }

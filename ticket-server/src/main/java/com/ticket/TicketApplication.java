@@ -2,6 +2,7 @@ package com.ticket;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 购票系统启动类。
@@ -10,6 +11,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * 亲身体会直接查库/行锁的瓶颈之后,阶段五起再拆微服务、上消息队列。
  */
 @SpringBootApplication
+@EnableScheduling   // 定时任务总开关(对账任务/库存续期用)
 public class TicketApplication {
 
     public static void main(String[] args) {

@@ -40,6 +40,21 @@ public class OrderController {
         throw new BizException(404, "排队记录不存在");
     }
     // 返回:status + orderId + failReason(0 排队中 / 1 成功 / 2 失败)
-    return Result.success(record);   
-}
+        return Result.success(record);   
+    }
+    @PostMapping("/cancel")
+    public Result<?> cancel(@RequestParam("orderId") Long orderId,
+                        @RequestHeader("X-User-Id") Long userId) {
+        orderService.cancelOrder(orderId, userId);
+        return Result.success();
+    }
+
+    /** 退票(20 已支付 → 50 已退票):座位回流与取消同链路;退款待支付模块 */
+    @PostMapping("/refund")
+    public Result<?> refund(@RequestParam("orderId") Long orderId,
+                            @RequestHeader("X-User-Id") Long userId) {
+        orderService.refundOrder(orderId, userId);
+        return Result.success();
+    }
+
 }

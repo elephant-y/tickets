@@ -21,7 +21,9 @@ import org.apache.rocketmq.spring.annotation.ConsumeMode;
 @RocketMQMessageListener(
         topic = "ORDER_CREATE",
         consumerGroup = "ticket-order-consumer",
-        consumeMode = ConsumeMode.ORDERLY)
+        consumeMode = ConsumeMode.CONCURRENTLY)
+// 为什么并发消费:每单相互独立(不同乘车人/不同库存key),正确性由 Lua 原子 + 幂等双保险保证,
+// 无需顺序;并发消费吞吐更高,且规避 ORDERLY 的队列锁在重启场景下的停滞问题(实测踩坑)
 public class OrderConsumer implements RocketMQListener<OrderMessage>{
     private static final Logger log = LoggerFactory.getLogger(OrderConsumer.class);
     @Autowired

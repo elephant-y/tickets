@@ -11,10 +11,13 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -68,6 +71,8 @@ public class OrderService {
     }
     @Autowired 
     private TransactionTemplate transactionTemplate;
+    @Value("${ticket.order.timeout-level:16}")
+    private int timeoutLevel;
     public OrderService(SeatHoldMapper seatHoldMapper,OrderMapper orderMapper,OrderItemMapper orderItemMapper,TrainSeatStockMapper trainSeatStockMapper,TrainStationMapper trainStationMapper,TrainMapper trainMapper,StockCache stockCache,OrderRequestMapper orderRequestMapper,ObjectMapper objectMapper)
     {
         this.seatHoldMapper=seatHoldMapper;
@@ -121,7 +126,7 @@ public class OrderService {
             deducted=true;
         // ⑥ 建订单 + 明细(编程式事务只包这一步)
             Long orderId = saveOrderAndItems(req, userId, fromNo, toNo, holdIds, intervals, trainNo, amount);
-
+            sendTimeoutMessage(orderId);
         // ⑦ 删除余票缓存(本地 + Redis)
             invalidateCache(req);
             return orderId;
@@ -130,6 +135,77 @@ public class OrderService {
             if(deducted) refundQuietly(keys, req.getPassengers().size());
             releaseHolds(holdIds);
             throw e;
+        }
+    }
+    /** 取消订单(10 待支付 → 40 已取消):超时闹钟/对账补刀/用户主动,三个入口共用 */
+    public boolean cancelOrder(Long orderId, Long userId) {
+        return migrateOrder(orderId, userId, 10, 40);
+    }
+
+    /** 退票(20 已支付 → 50 已退票):座位回流链路与取消完全相同;退款(钱)待阶段七支付模块 */
+    public boolean refundOrder(Long orderId, Long userId) {
+        return migrateOrder(orderId, userId, 20, 50);
+    }
+
+    /** 订单状态迁移(取消/退票共用的回流链路):入口校验 → 事务内三件事 → 事务外回补 */
+    private boolean migrateOrder(Long orderId, Long userId, int fromStatus, int toStatus) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) throw new BizException(404, "订单不存在");
+        if (order.getStatus() != fromStatus) {
+            return false;      // 状态机幂等入口:非目标状态 → 不做任何事(闹钟作废/重复操作拦截)
+        }
+        if (!order.getUserId().equals(userId)) {
+            throw new BizException(403, "无权操作该订单");
+        }
+        // ── 事务外准备:站序换算 + 重叠区间(回补和失效都要用)──
+        int fromNo = resolveStationNo(order.getTrainId(), order.getFromStationId());
+        int toNo = resolveStationNo(order.getTrainId(), order.getToStationId());
+        List<int[]> intervals = overlapIntervals(order.getTrainId(), order.getTrainDate(),
+                order.getSeatTypeId(), fromNo, toNo);
+        List<String> keys = intervals.stream()
+                .map(iv -> stockKey(order.getTrainId(), order.getTrainDate(),
+                        order.getSeatTypeId(), iv[0], iv[1]))
+                .toList();
+
+        Boolean done = transactionTemplate.execute(status -> {
+            // ① 状态迁移(WHERE status=fromStatus 条件更新 ← 防并发重复操作,行锁保证只有一个成功)
+            int affected = orderMapper.update(null, new LambdaUpdateWrapper<Order>()
+                    .eq(Order::getId, orderId)
+                    .eq(Order::getStatus, fromStatus)
+                    .set(Order::getStatus, toStatus)
+                    .set(Order::getCancelTime, LocalDateTime.now()));
+            if (affected == 0) return false;      // 并发下已被处理 → 本次什么都不做
+
+            // ② DB sold 回减:每重叠区间 -count(下单 updateSold 的反向,真相层同步)
+            for (int[] iv : intervals) {
+                trainSeatStockMapper.decreaseSold(order.getTrainId(), order.getTrainDate(),
+                        order.getSeatTypeId(), iv[0], iv[1], order.getTicketCount());
+            }
+
+            // ③ 删凭证:按 orderId 删(阶段四回填过 orderId)——乘车人可以重新购买
+            seatHoldMapper.delete(new LambdaQueryWrapper<SeatHold>()
+                    .eq(SeatHold::getOrderId, orderId));
+            return true;
+        });
+
+        if (!Boolean.TRUE.equals(done)) {
+            return false;      // 并发下已被处理,幂等返回
+        }
+
+        // ── 事务外:Redis 回补 + 失效查询缓存(和下单补偿同款)──
+        refundQuietly(keys, order.getTicketCount());
+        stockCache.invalidate("stock:" + order.getTrainId() + ":" + order.getTrainDate());
+        return true;
+    }
+    private void sendTimeoutMessage(Long orderId) {
+        try {
+            // 用 Spring Message + 四参 syncSend(该重载专为延迟消息设计):
+            // 若用原生 Message,starter 转换器会把整个 Message 对象 JSON 化,消费者拿到的是
+            // {"topic":...,"body":"base64"} 而不是纯文本 —— 实测踩坑(NumberFormatException)
+            Message<String> msg = MessageBuilder.withPayload(String.valueOf(orderId)).build();
+            rocketMQTemplate.syncSend("ORDER_TIMEOUT", msg, 3000, timeoutLevel);
+        } catch (Exception e) {
+            log.error("延迟消息发送失败,orderId={},待对账兜底", orderId, e);
         }
     }
     private Long saveOrderAndItems(CreateOrderRequest req, Long userId, int fromNo, int toNo,
@@ -221,10 +297,16 @@ public class OrderService {
     }
 
     /** 重叠区间计算:返回 (x, y) 数字对 —— 两个消费者:拼 key 扣 Redis、按区间同步 DB sold */
+    /** 请求版:委托给参数版(单一数据源:重叠计算只写一份) */
     private List<int[]> overlapIntervals(CreateOrderRequest req, int fromNo, int toNo) {
+        return overlapIntervals(req.getTrainId(), req.getTrainDate(), req.getSeatTypeId(), fromNo, toNo);
+    }
+
+    /** 参数版:下单与取消共用 */
+    private List<int[]> overlapIntervals(Long trainId, LocalDate date, Long seatTypeId, int fromNo, int toNo) {
         List<TrainStation> stations = trainStationMapper.selectList(
             new LambdaQueryWrapper<TrainStation>()
-                    .eq(TrainStation::getTrainId, req.getTrainId())
+                    .eq(TrainStation::getTrainId, trainId)
                     .orderByAsc(TrainStation::getStationNo));
         List<int[]> intervals = new ArrayList<>();
         for (int i = 0; i < stations.size(); i++) {
