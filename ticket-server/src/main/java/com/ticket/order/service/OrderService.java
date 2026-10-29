@@ -39,9 +39,8 @@ import com.ticket.order.mapper.SeatHoldMapper;
 import com.ticket.ticket.cache.StockCache;
 import com.ticket.ticket.entity.TrainSeatStock;
 import com.ticket.ticket.mapper.TrainSeatStockMapper;
-import com.ticket.train.entity.TrainStation;
-import com.ticket.train.mapper.TrainMapper;
-import com.ticket.train.mapper.TrainStationMapper;
+import com.ticket.common.dto.StationInfo;
+import com.ticket.order.client.TrainInnerClient;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 
 @Service
@@ -52,8 +51,7 @@ public class OrderService {
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
     private final TrainSeatStockMapper trainSeatStockMapper;
-    private final TrainStationMapper trainStationMapper;
-    private final TrainMapper trainMapper;
+    private final TrainInnerClient trainInnerClient;
     private final OrderRequestMapper orderRequestMapper;
     private final ObjectMapper objectMapper;
     @Autowired 
@@ -73,14 +71,13 @@ public class OrderService {
     private TransactionTemplate transactionTemplate;
     @Value("${ticket.order.timeout-level:16}")
     private int timeoutLevel;
-    public OrderService(SeatHoldMapper seatHoldMapper,OrderMapper orderMapper,OrderItemMapper orderItemMapper,TrainSeatStockMapper trainSeatStockMapper,TrainStationMapper trainStationMapper,TrainMapper trainMapper,StockCache stockCache,OrderRequestMapper orderRequestMapper,ObjectMapper objectMapper)
+    public OrderService(SeatHoldMapper seatHoldMapper,OrderMapper orderMapper,OrderItemMapper orderItemMapper,TrainSeatStockMapper trainSeatStockMapper,TrainInnerClient trainInnerClient,StockCache stockCache,OrderRequestMapper orderRequestMapper,ObjectMapper objectMapper)
     {
         this.seatHoldMapper=seatHoldMapper;
         this.orderMapper=orderMapper;
         this.orderItemMapper=orderItemMapper;
         this.trainSeatStockMapper=trainSeatStockMapper;
-        this.trainStationMapper=trainStationMapper;
-        this.trainMapper=trainMapper;
+        this.trainInnerClient=trainInnerClient;
         this.stockCache=stockCache;
         this.orderRequestMapper=orderRequestMapper;
         this.objectMapper=objectMapper;
@@ -113,7 +110,7 @@ public class OrderService {
         List<String> keys = intervals.stream()
                 .map(iv -> stockKey(req.getTrainId(), req.getTrainDate(), req.getSeatTypeId(), iv[0], iv[1]))
                 .toList();
-        String trainNo = trainMapper.selectById(req.getTrainId()).getTrainNo();   // 冗余车次号
+        String trainNo = trainInnerClient.getTrainInfo(req.getTrainId()).getData().getTrainNo();   // 冗余车次号(Feign)
         BigDecimal amount = calcAmount(req);                                      // 事务外算好传入
         boolean deducted=false;
         try {
@@ -303,12 +300,9 @@ public class OrderService {
         return overlapIntervals(req.getTrainId(), req.getTrainDate(), req.getSeatTypeId(), fromNo, toNo);
     }
 
-    /** 参数版:下单与取消共用 */
+    /** 参数版:下单与取消共用(经停列表改走 Feign 调 train-service) */
     private List<int[]> overlapIntervals(Long trainId, LocalDate date, Long seatTypeId, int fromNo, int toNo) {
-        List<TrainStation> stations = trainStationMapper.selectList(
-            new LambdaQueryWrapper<TrainStation>()
-                    .eq(TrainStation::getTrainId, trainId)
-                    .orderByAsc(TrainStation::getStationNo));
+        List<StationInfo> stations = trainInnerClient.listStations(trainId).getData();
         List<int[]> intervals = new ArrayList<>();
         for (int i = 0; i < stations.size(); i++) {
             for (int j = i + 1; j < stations.size(); j++) {
@@ -330,16 +324,9 @@ public class OrderService {
         return BigDecimal.valueOf(yuan);
     }
 
-    /** 里程查询:与 resolveStationNo 同源,复用「站点合法性守门」逻辑 */
+    /** 里程查询(Feign 版):与 resolveStationNo 同源,守门逻辑在 train-service 的 404 里 */
     private int resolveMileage(Long trainId, Long stationId) {
-        TrainStation ts = trainStationMapper.selectOne(
-                new LambdaQueryWrapper<TrainStation>()
-                        .eq(TrainStation::getTrainId, trainId)
-                        .eq(TrainStation::getStationId, stationId));
-        if (ts == null) {
-            throw new BizException(400, "站点不在该车次的经停站中");
-        }
-        return ts.getMileage();
+        return trainInnerClient.getStation(trainId, stationId).getData().getMileage();
     }
     private String stockKey(Long trainId, LocalDate date, Long seatTypeId, int fromNo, int toNo) {
         return "stock:" + trainId + ":" + date + ":" + seatTypeId + ":" + fromNo + ":" + toNo;
@@ -406,15 +393,8 @@ public class OrderService {
                 + String.format("%06d", ThreadLocalRandom.current().nextInt(1_000_000));
     }
 
-    /** ② 站序换算:stationId → stationNo(翻译 + 合法性守门,不信任前端传站序) */
+    /** ② 站序换算(Feign 版):stationId → stationNo;合法性守门在 train-service(查不到 404) */
     private int resolveStationNo(Long trainId, Long stationId) {
-        TrainStation ts = trainStationMapper.selectOne(
-                new LambdaQueryWrapper<TrainStation>()
-                        .eq(TrainStation::getTrainId, trainId)
-                        .eq(TrainStation::getStationId, stationId));
-        if (ts == null) {
-            throw new BizException(400, "站点不在该车次的经停站中");
-        }
-        return ts.getStationNo();
+        return trainInnerClient.getStation(trainId, stationId).getData().getStationNo();
     }
 }

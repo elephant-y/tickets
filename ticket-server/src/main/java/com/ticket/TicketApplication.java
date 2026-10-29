@@ -2,6 +2,7 @@ package com.ticket;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
@@ -12,6 +13,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  */
 @SpringBootApplication
 @EnableScheduling   // 定时任务总开关(对账任务/库存续期用)
+@EnableFeignClients // 服务间调用(调 train-service 的内部接口)
 public class TicketApplication {
 
     public static void main(String[] args) {

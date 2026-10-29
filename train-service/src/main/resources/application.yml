@@ -1,0 +1,21 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: train-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+  datasource:
+    url: jdbc:mysql://localhost:3307/ticket?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: "123456"
+
+ticket:
+  jwt:
+    # common 的 JwtUtil 被本服务扫描注册,它要求这个配置存在(本服务不签发 token,仅满足占位符)
+    secret: ticket-12306-jwt-secret-key-2026-pls-change-me
+  snowflake:
+    worker-id: 3      # 关键:user-service=2、ticket-server=1,每个进程一个编号,撞号则同毫秒主键冲突

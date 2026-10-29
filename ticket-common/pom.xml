@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.ticket</groupId>
+        <artifactId>ticket-parent</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>ticket-common</artifactId>
+
+    <dependencies>
+        <!--
+          只依赖 spring-web(注解/ResponseEntity 抽象层),不引 spring-boot-starter-web(MVC 实现):
+          common 被所有服务引用,包括 WebFlux 的网关 —— 带 MVC 实现会传染冲突。
+          栈无关原则:公共模块只依赖「双方都能用」的抽象,栈实现由各服务自选。
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+        </dependency>
+        <!-- MissingServletRequestParameterException 的父类是 servlet 异常,编译需要;
+             provided = 运行时由容器(Tomcat)提供,且网关(Netty)不加载这个类 -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+        <!--
+          只引 mybatis-plus-core(IdentifierGenerator 接口所在),不引 starter:
+          starter 带 JDBC 自动配置,会传染给无数据库的服务(网关)。
+          原则:公共模块只带「库」,不带「starter 自动配置」,完整功能由各服务自引。
+        -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-core</artifactId>
+            <version>3.5.5</version>
+        </dependency>
+        <!-- 去掉 starter 后 slf4j 传递依赖也没了,显式声明(版本由 Boot BOM 管理) -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <!-- DuplicateKeyException 所在包 org.springframework.dao 属于 spring-tx -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-tx</artifactId>
+        </dependency>
+        <!-- @Configuration/@Bean 等注解所在,容器基础 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+        <!-- 雪花算法的测试随类搬进了 common -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

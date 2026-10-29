@@ -4,18 +4,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!--
-      Spring Boot 3.2.5 + JDK 17:
-      为什么锁这个组合?阶段二引入 Spring Cloud Alibaba 2023.0.1.0(Nacos/Sentinel/Seata),
-      它官方配套 Spring Cloud 2023.0.1 / Boot 3.2.x —— 这是目前资料最多、踩坑最少的组合。
-      Boot 3.2 官方支持 JDK 17~21,不支持更新的 JDK(见项目 README/文档说明)。
-    -->
     <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.5</version>
-        <relativePath/>
+        <groupId>com.ticket</groupId>
+        <artifactId>ticket-parent</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
     </parent>
+
+    
 
     <groupId>com.ticket</groupId>
     <artifactId>ticket-server</artifactId>
@@ -35,24 +30,7 @@
       两个 BOM 只做版本仲裁(dependencyManagement 不引入任何依赖),
       实际要用的组件在下面的 dependencies 里声明,版本由 BOM 决定
     -->
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-dependencies</artifactId>
-                <version>${spring-cloud.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>com.alibaba.cloud</groupId>
-                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
-                <version>${spring-cloud-alibaba.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
+   
 
     <dependencies>
         <!-- Web:阶段二起的 REST 接口都基于它(内嵌 Tomcat) -->
@@ -82,29 +60,22 @@
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
         </dependency>
-        <!-- 只取 BCrypt 密码算法;不引整包 Spring Security(整包自带登录页和拦截器,全是负担) -->
         <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-crypto</artifactId>
+            <groupId>com.ticket</groupId>
+            <artifactId>ticket-common</artifactId>
         </dependency>
-        <!-- JWT:api 编译期用;impl/jackson 运行时提供实现 -->
+        <!-- Feign:拆微服务后的服务间调用(调 train-service 的内部接口) -->
         <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-api</artifactId>
-            <version>0.12.6</version>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
+        <!-- Feign 按服务名解析必须的负载均衡器(否则 No Feign Client for loadBalancing) -->
         <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-impl</artifactId>
-            <version>0.12.6</version>
-            <scope>runtime</scope>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
         </dependency>
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-jackson</artifactId>
-            <version>0.12.6</version>
-            <scope>runtime</scope>
-        </dependency>
+
+       
         <!-- Redis:阶段三多级缓存的中间层(默认客户端 Lettuce,基于 Netty 异步) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
