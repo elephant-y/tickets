@@ -6,9 +6,9 @@ spring:
          discovery:
            server-addr: localhost:8848
      datasource:
-         url: jdbc:mysql://localhost:3307/ticket?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-         username: root
-         password: 123456 
+         # 数据源交给 ShardingSphere:连接串指向分片配置(真实连接信息在 sharding.yaml)
+         url: jdbc:shardingsphere:classpath:sharding.yaml
+         driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
      data:
       redis:
         host: localhost

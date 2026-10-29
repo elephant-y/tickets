@@ -1,0 +1,80 @@
+# ShardingSphere 分片配置(JDBC Driver 模式读取)
+# 设计:orders/order_item 按 user_id % 4 分到 ds_0~ds_3(绑定表,同键同片);
+#       其余表显式声明路由到 ds_main —— 部分分片的正确姿势:
+#       「未配置规则的表会被随机路由到分片库」,所以单表也必须显式声明,不能省略。
+dataSources:
+  ds_main:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://localhost:3307/ticket?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: "123456"
+  ds_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://localhost:3307/ticket_0?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: "123456"
+  ds_1:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://localhost:3307/ticket_1?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: "123456"
+  ds_2:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://localhost:3307/ticket_2?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: "123456"
+  ds_3:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://localhost:3307/ticket_3?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: "123456"
+
+rules:
+  - !SHARDING
+    tables:
+      orders:
+        actualDataNodes: ds_${0..3}.orders
+        databaseStrategy:
+          standard:
+            shardingColumn: user_id          # 分片键:高频查询条件 + 分布均匀
+            shardingAlgorithmName: mod4
+      order_item:
+        actualDataNodes: ds_${0..3}.order_item
+        databaseStrategy:
+          standard:
+            shardingColumn: user_id          # 与 orders 同键同片(绑定表前提)
+            shardingAlgorithmName: mod4
+      # ---- 以下为非分片表:显式声明,固定路由到主库 ----
+      user:
+        actualDataNodes: ds_main.user
+      station:
+        actualDataNodes: ds_main.station
+      train:
+        actualDataNodes: ds_main.train
+      seat_type:
+        actualDataNodes: ds_main.seat_type
+      train_station:
+        actualDataNodes: ds_main.train_station
+      train_seat_stock:
+        actualDataNodes: ds_main.train_seat_stock
+      order_request:
+        actualDataNodes: ds_main.order_request
+      seat_hold:
+        actualDataNodes: ds_main.seat_hold
+      pay_record:
+        actualDataNodes: ds_main.pay_record
+    bindingTables:
+      - orders,order_item                    # 绑定表:同键同片,JOIN 不跨片
+    shardingAlgorithms:
+      mod4:
+        type: INLINE                          # 行表达式算法:最经典、最直观
+        props:
+          algorithm-expression: ds_${user_id % 4}   # 目标库名 = 前缀 + user_id 取模
+
+props:
+  sql-show: true    # 打印路由后的真实 SQL(教学:看到每句 SQL 去了哪个库)

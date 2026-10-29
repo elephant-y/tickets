@@ -232,9 +232,10 @@ public class OrderService {
             for (Passenger p : req.getPassengers()) {
                 OrderItem item = new OrderItem();
                 item.setOrderId(order.getId());      // ① 回填的雪花 id
+                item.setUserId(userId);              // 分片键冗余:与 orders 同键同片(阶段八绑定表)
                 item.setPassengerName(p.getName());
                 item.setIdCard(p.getIdCard());
-                // seatNo 留空:计数模型阶段不分配座位,出票时回填(阶段七)
+                // seatNo 留空:计数模型阶段不分配座位,出票时回填
                 orderItemMapper.insert(item);
             }
 

@@ -130,6 +130,19 @@
             <artifactId>rocketmq-client</artifactId>
             <version>5.2.0</version>
         </dependency>
+        <!-- ShardingSphere JDBC:JDBC Driver 模式(与 Boot 版本解耦),配置独立 sharding.yaml
+             5.5.0(镜像仅有此版本);排除 test-util(打包瑕疵,运行不需要);算法用 INLINE 避开 MOD 自动归类坑 -->
+        <dependency>
+            <groupId>org.apache.shardingsphere</groupId>
+            <artifactId>shardingsphere-jdbc</artifactId>
+            <version>5.5.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.shardingsphere</groupId>
+                    <artifactId>shardingsphere-test-util</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
     </dependencies>
 
     <build>

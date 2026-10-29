@@ -11,6 +11,8 @@ public class OrderItem {
     private Long id;
     /** 所属订单ID(1:N) */
     private Long orderId;
+    /** 分片键冗余:与 orders 同键同片(阶段八绑定表,JOIN 不跨片) */
+    private Long userId;
     /** 乘车人姓名 */
     private String passengerName;
     /** 乘车人证件号(幂等防重的关键字段之一) */
@@ -32,6 +34,14 @@ public class OrderItem {
 
     public void setOrderId(Long orderId) {
         this.orderId = orderId;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
     public String getPassengerName() {
