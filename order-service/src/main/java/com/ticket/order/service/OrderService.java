@@ -139,7 +139,8 @@ public class OrderService {
                 .eq(Order::getId, orderId)
                 .eq(Order::getStatus, 10)
                 .set(Order::getStatus, 20)
-                .set(Order::getPayTime, LocalDateTime.now()));
+                .set(Order::getPayTime, LocalDateTime.now())
+                .set(Order::getUpdateTime, LocalDateTime.now()));  // wrapper 更新不带实体,updateFill 不触发,显式补
         if (affected == 0) {
             Order cur = orderMapper.selectById(orderId);
             if (cur != null && cur.getStatus() == 20) {
@@ -180,7 +181,8 @@ public class OrderService {
                     .eq(Order::getId, orderId)
                     .eq(Order::getStatus, fromStatus)
                     .set(Order::getStatus, toStatus)
-                    .set(Order::getCancelTime, LocalDateTime.now()));
+                    .set(Order::getCancelTime, LocalDateTime.now())
+                    .set(Order::getUpdateTime, LocalDateTime.now()));  // 同上:wrapper 更新显式补 updateTime
             if (affected == 0) return false;      // 并发下已被处理 → 本次什么都不做
 
             // ② 删凭证:按 orderId 删(阶段四回填过 orderId)——乘车人可以重新购买

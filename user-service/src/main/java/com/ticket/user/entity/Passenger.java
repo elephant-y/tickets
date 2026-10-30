@@ -2,13 +2,15 @@ package com.ticket.user.entity;
 
 import java.time.LocalDateTime;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
 /**
  * 常用乘车人:账号(user)下储存的乘车人,下单时勾选,不再手输。
- * create_time 由 DB 默认值 CURRENT_TIMESTAMP 填充(库时区已统一 +08:00)。
+ * create_time 由 common AutoFillMetaObjectHandler 以 JVM 时钟填充(不依赖 DB 默认值)。
  */
 @TableName ("passenger")
 public class Passenger {
@@ -17,6 +19,7 @@ public class Passenger {
     private Long userId;
     private String name;
     private String idCard;
+    @TableField (fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
     public Long getId() {

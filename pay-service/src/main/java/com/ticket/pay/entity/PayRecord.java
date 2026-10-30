@@ -3,7 +3,9 @@ package com.ticket.pay.entity;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
@@ -26,7 +28,8 @@ public class PayRecord {
     private Integer status;
     /** 支付时间 */
     private LocalDateTime payTime;
-    /** 创建时间(DB 默认值) */
+    /** 创建时间(common AutoFillMetaObjectHandler 以 JVM 时钟填充) */
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
     public Long getId() {
