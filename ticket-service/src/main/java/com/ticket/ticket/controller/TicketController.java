@@ -19,9 +19,12 @@ public class TicketController {
         this.ticketService=ticketService;
     }
     @GetMapping ("/stock")
-    public Result<?> seatstock(@RequestParam ("trainId") Long trainId, @RequestParam ("date") LocalDate date)
+    public Result<?> seatstock(@RequestParam ("trainId") Long trainId,
+                               @RequestParam ("date") LocalDate date,
+                               @RequestParam ("fromStationId") Long fromStationId,
+                               @RequestParam ("toStationId") Long toStationId)
     {
-        return Result.success(ticketService.seatstock(trainId,date));
+        return Result.success(ticketService.seatstock(trainId, date, fromStationId, toStationId));
     }
     
 }

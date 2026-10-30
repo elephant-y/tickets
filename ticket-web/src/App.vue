@@ -45,11 +45,9 @@
       <el-card v-if="selectedTrain" class="card">
         <h3>{{ selectedTrain.trainNo }} {{ selectedTrain.startStationName }} → {{ selectedTrain.endStationName }}</h3>
         <el-table :data="stockRows" @row-click="selectStock" highlight-current-row>
-          <el-table-column prop="seatTypeName" label="座位类型" width="120" />
-          <el-table-column prop="fromStationNo" label="出发站序" width="100" />
-          <el-table-column prop="toStationNo" label="到达站序" width="100" />
-          <el-table-column prop="available" label="余票" width="100" />
-          <el-table-column prop="totalSeat" label="总票额" width="100" />
+          <el-table-column prop="seatTypeName" label="座位类型" width="140" />
+          <el-table-column prop="available" label="余票" width="120" />
+          <el-table-column prop="totalSeat" label="总票额" width="120" />
         </el-table>
         <div class="row" style="margin-top: 12px">
           <el-input v-model="passengerName" placeholder="乘车人姓名" style="width: 160px" />
@@ -163,8 +161,14 @@ async function searchTrains() {
 
 async function selectTrain(row) {
   selectedTrain.value = row;
+  // 12306 语义:查询「出发站→到达站」这一个区间的各座位类型余票(后端过滤后返回 3 行)
   stockRows.value = await http.get("/ticket/stock", {
-    params: { trainId: row.trainId, date: trainDate.value },
+    params: {
+      trainId: row.trainId,
+      date: trainDate.value,
+      fromStationId: fromStationId.value,
+      toStationId: toStationId.value,
+    },
   });
   selectedStock.value = null;
 }
