@@ -19,11 +19,19 @@ spring:
           uri: lb://train-service
           predicates:
             - Path=/api/train/**
-        # 注意:/api/inner/** 不在任何路由里 —— 内部接口不对用户开放(阶段十补服务间认证)
-        - id: ticket-server-route      # 其余 /api/** 走单体(拆分中)
-          uri: lb://ticket-server
+        - id: ticket-service-route
+          uri: lb://ticket-service
           predicates:
-            - Path=/api/**
+            - Path=/api/ticket/**
+        - id: order-service-route
+          uri: lb://order-service
+          predicates:
+            - Path=/api/order/**
+        - id: pay-service-route
+          uri: lb://pay-service
+          predicates:
+            - Path=/api/pay/**
+        # 注意:/api/inner/** 不在任何路由里 —— 内部接口不对用户开放(阶段十补服务间认证)
 ticket:
   jwt:
     secret: ticket-12306-jwt-secret-key-2026-pls-change-me

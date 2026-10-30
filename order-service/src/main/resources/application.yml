@@ -1,0 +1,30 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: order-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+  datasource:
+    # 数据源交给 ShardingSphere(orders/order_item 分片规则在 sharding.yaml)
+    url: jdbc:shardingsphere:classpath:sharding.yaml
+    driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+
+ticket:
+  jwt:
+    # common 的 JwtUtil 被扫描注册,满足占位符
+    secret: ticket-12306-jwt-secret-key-2026-pls-change-me
+  snowflake:
+    worker-id: 5      # user=2 train=3 ticket=4,本服务=5
+  order:
+    timeout-level: 5      # 5=1分钟(测试),生产 16=30分钟
+  reconcile:
+    interval-seconds: 60
+
+rocketmq:
+  name-server: localhost:9876
+  producer:
+    group: ticket-producer
