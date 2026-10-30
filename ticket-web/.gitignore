@@ -1,0 +1,7 @@
+# 依赖(npm install 重新生成,绝不进版本库)
+node_modules/
+# 构建产物
+dist/
+# 本地环境
+*.local
+.DS_Store
