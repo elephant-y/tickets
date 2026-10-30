@@ -157,3 +157,18 @@ CREATE TABLE `seat_hold` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_hold` (`id_card`, `train_id`, `train_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='占座凭证表:占座插入,取消/退票删除';
+
+-- -------------------------------------------------------------
+-- 10. 常用乘车人表(账号下储存的乘车人,下单时勾选)
+-- -------------------------------------------------------------
+DROP TABLE IF EXISTS `passenger`;
+CREATE TABLE `passenger` (
+  `id`          BIGINT      NOT NULL COMMENT '主键,雪花ID',
+  `user_id`     BIGINT      NOT NULL COMMENT '所属账号ID',
+  `name`        VARCHAR(32) NOT NULL COMMENT '乘车人姓名',
+  `id_card`     VARCHAR(18) NOT NULL COMMENT '证件号',
+  `create_time` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_card` (`user_id`, `id_card`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='常用乘车人表:同一账号同证件仅一条,删除不影响已购车票';
