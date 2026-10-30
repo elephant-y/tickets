@@ -20,7 +20,7 @@ ticket:
   snowflake:
     worker-id: 5      # user=2 train=3 ticket=4,本服务=5
   order:
-    timeout-level: 5      # 5=1分钟(测试),生产 16=30分钟
+    timeout-level: 16     # 16=30分钟(生产值);压测超时场景时再临时改 5=1分钟
   reconcile:
     interval-seconds: 60
 
