@@ -7,7 +7,7 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: localhost:8848
+        server-addr: ${NACOS_ADDR:localhost:8848}
     gateway:
       routes:
         # 更具体的路由必须排在前面:网关按声明顺序匹配,先到先得
@@ -34,4 +34,4 @@ spring:
         # 注意:/api/inner/** 不在任何路由里 —— 内部接口不对用户开放(阶段十补服务间认证)
 ticket:
   jwt:
-    secret: ticket-12306-jwt-secret-key-2026-pls-change-me
+    secret: ${JWT_SECRET:ticket-12306-jwt-secret-key-2026-pls-change-me}

@@ -7,16 +7,16 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: localhost:8848
+        server-addr: ${NACOS_ADDR:localhost:8848}
   datasource:
     # pay_record 在主库,不分片,直连
-    url: jdbc:mysql://localhost:3307/ticket?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3307}/ticket?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
     password: "123456"
 
 ticket:
   jwt:
     # common 的 JwtUtil 被扫描注册,满足占位符
-    secret: ticket-12306-jwt-secret-key-2026-pls-change-me
+    secret: ${JWT_SECRET:ticket-12306-jwt-secret-key-2026-pls-change-me}
   snowflake:
     worker-id: 6

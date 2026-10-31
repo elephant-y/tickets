@@ -6,31 +6,34 @@ dataSources:
   ds_main:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://localhost:3307/ticket?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    # allowPublicKeyRetrieval=true:ShardingSphere 建池的 SSL 协商路径与直连不同,
+    # caching_sha2 完整认证需要取服务器 RSA 公钥;MySQL 冷启动(认证缓存清空)时
+    # 不显式允许就直接报 "Public Key Retrieval is not allowed"。
+    jdbcUrl: jdbc:mysql://localhost:3307/ticket?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: "123456"
   ds_0:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://localhost:3307/ticket_0?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    jdbcUrl: jdbc:mysql://localhost:3307/ticket_0?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: "123456"
   ds_1:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://localhost:3307/ticket_1?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    jdbcUrl: jdbc:mysql://localhost:3307/ticket_1?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: "123456"
   ds_2:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://localhost:3307/ticket_2?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    jdbcUrl: jdbc:mysql://localhost:3307/ticket_2?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: "123456"
   ds_3:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://localhost:3307/ticket_3?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    jdbcUrl: jdbc:mysql://localhost:3307/ticket_3?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: "123456"
 

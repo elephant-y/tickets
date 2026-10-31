@@ -7,15 +7,15 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: localhost:8848
+        server-addr: ${NACOS_ADDR:localhost:8848}
   datasource:
-    url: jdbc:mysql://localhost:3307/ticket?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3307}/ticket?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
     password: "123456"
 
 ticket:
   jwt:
-    secret: ticket-12306-jwt-secret-key-2026-pls-change-me   # 与网关验签的密钥一致
+    secret: ${JWT_SECRET:ticket-12306-jwt-secret-key-2026-pls-change-me}  # 与网关验签的密钥一致
     expire-hours: 2
   snowflake:
     worker-id: 2      # 关键:与 ticket-server(1)不同 —— 两个进程生成雪花ID写同一个库,workerId 相同会撞主键
