@@ -6,7 +6,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +35,7 @@ import com.ticket.order.mapper.SeatHoldMapper;
 import com.ticket.common.dto.DeductRequest;
 import com.ticket.common.dto.Interval;
 import com.ticket.common.dto.StationInfo;
+import com.ticket.common.id.SnowflakeIdGenerator;
 import com.ticket.order.client.StockInnerClient;
 import com.ticket.order.client.TrainInnerClient;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
@@ -51,13 +51,14 @@ public class OrderService {
     private final StockInnerClient stockInnerClient;
     private final OrderRequestMapper orderRequestMapper;
     private final ObjectMapper objectMapper;
+    private final SnowflakeIdGenerator snowflakeIdGenerator;
     @Autowired
     private RocketMQTemplate rocketMQTemplate;
     @Autowired
     private TransactionTemplate transactionTemplate;
     @Value("${ticket.order.timeout-level:16}")
     private int timeoutLevel;
-    public OrderService(SeatHoldMapper seatHoldMapper,OrderMapper orderMapper,OrderItemMapper orderItemMapper,TrainInnerClient trainInnerClient,StockInnerClient stockInnerClient,OrderRequestMapper orderRequestMapper,ObjectMapper objectMapper)
+    public OrderService(SeatHoldMapper seatHoldMapper,OrderMapper orderMapper,OrderItemMapper orderItemMapper,TrainInnerClient trainInnerClient,StockInnerClient stockInnerClient,OrderRequestMapper orderRequestMapper,ObjectMapper objectMapper,SnowflakeIdGenerator snowflakeIdGenerator)
     {
         this.seatHoldMapper=seatHoldMapper;
         this.orderMapper=orderMapper;
@@ -66,12 +67,15 @@ public class OrderService {
         this.stockInnerClient=stockInnerClient;
         this.orderRequestMapper=orderRequestMapper;
         this.objectMapper=objectMapper;
+        this.snowflakeIdGenerator=snowflakeIdGenerator;
     }
     public String createOrder(CreateOrderRequest req,Long userId) 
     {
         validate(req);
-        String requestId = generateOrderNo();
+        long rid = snowflakeIdGenerator.nextId();   // 排队凭证与主键同源:撞号概率从"生日悖论"降为 0
+        String requestId = buildBizNo(rid);
         OrderRequest record=new OrderRequest();
+        record.setId(rid);                          // 显式设主键,MP 不再回填
         record.setRequestId(requestId);
         record.setUserId(userId);
         try {
@@ -221,7 +225,9 @@ public class OrderService {
         return transactionTemplate.execute(status -> {
             // ===== ① 建订单 =====
             Order order = new Order();
-            order.setOrderNo(generateOrderNo());            // 业务订单号:T+时间+随机
+            long oid = snowflakeIdGenerator.nextId();       // 主键与订单号同源,订单号构造上唯一
+            order.setId(oid);
+            order.setOrderNo(buildBizNo(oid));              // 业务订单号:T+时间+雪花末6位
             order.setUserId(userId);                        // 网关注入的用户
             order.setTrainId(req.getTrainId());
             order.setTrainNo(trainNo);                      // 冗余车次号(事务外查好传入)
@@ -233,7 +239,7 @@ public class OrderService {
             order.setTotalAmount(amount);                   // 事务外算好传入(事务内只写不算)
             order.setStatus(10);                            // 10 = 待支付,状态机起点
             // payTime / cancelTime 留空:未支付、未取消
-            orderMapper.insert(order);                      // 雪花 id 回填
+            orderMapper.insert(order);                      // id 已显式生成,MP 不再回填
 
             // ===== ② 循环插明细(一单一票:票数 = 乘车人数) =====
             for (Passenger p : req.getPassengers()) {
@@ -341,13 +347,16 @@ public class OrderService {
     }
 
     /**
-     * 订单号生成(方案A):业务标识 T + 下单时间到秒 + 6 位随机数。
-     * 与雪花主键解耦:业务编号给人看(时间可读),主键给机器用;随机后缀防遍历,
-     * 同一秒撞号的概率由 uk_order_no 唯一索引兜底。
+     * 业务单号生成(排队号/订单号共用):业务标识 T + 时间到秒 + 雪花 ID 末 6 位。
+     * 为什么不用随机 6 位:随机数在同一秒内的碰撞服从生日悖论,645 TPS 下每秒约 20%
+     * 概率撞号(压测实测 12~31 次/分钟),uk_request/uk_order_no 唯一索引把撞号转化成
+     * "排队被拒 / 订单失败"。后缀改取雪花 ID 末 6 位后:同一秒内 ID 递增幅度远小于
+     * 10^6,末 6 位必不重复 → 单号构造上唯一,零撞号。
+     * 防遍历性由雪花 ID 本身承载,可读性不变(T+时间)。
      */
-    private String generateOrderNo() {
+    private String buildBizNo(long id) {
         return "T" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
-                + String.format("%06d", ThreadLocalRandom.current().nextInt(1_000_000));
+                + String.format("%06d", id % 1_000_000);
     }
 
     /** ② 站序换算(Feign 版):stationId → stationNo;合法性守门在 train-service(查不到 404) */

@@ -42,13 +42,13 @@ rules:
         databaseStrategy:
           standard:
             shardingColumn: user_id          # 分片键:高频查询条件 + 分布均匀
-            shardingAlgorithmName: mod4
+            shardingAlgorithmName: hash-mod4
       order_item:
         actualDataNodes: ds_${0..3}.order_item
         databaseStrategy:
           standard:
             shardingColumn: user_id          # 与 orders 同键同片(绑定表前提)
-            shardingAlgorithmName: mod4
+            shardingAlgorithmName: hash-mod4
       # ---- 以下为非分片表:显式声明,固定路由到主库 ----
       user:
         actualDataNodes: ds_main.user
@@ -71,10 +71,16 @@ rules:
     bindingTables:
       - orders,order_item                    # 绑定表:同键同片,JOIN 不跨片
     shardingAlgorithms:
-      mod4:
-        type: INLINE                          # 行表达式算法:最经典、最直观
+      # 为什么不用 ds_${user_id % 4}:user_id 是雪花 ID,直接取模落在 ID 最低 2 位
+      # = 序列号段,低流量下序列号恒 0 → 全部订单永远落 ds_0(压测实测 14.6 万笔全在 ds_0)。
+      # user_id 先剥离低 22 位(序列号 12 位 + worker 10 位),再 % 4 取时间戳的最低
+      # 2 位 —— 不同毫秒生成的 ID 天然轮转打散,注册时间相差 4 毫秒以上的用户必然
+      # 不同片。注意 INLINE 表达式是 Groovy 语义:`/` 是真除法(5/2=2.5,曾导致路由名
+      # 变成 ds_3.001953125 而报错),整数除法必须用 intdiv()。
+      hash-mod4:
+        type: INLINE
         props:
-          algorithm-expression: ds_${user_id % 4}   # 目标库名 = 前缀 + user_id 取模
+          algorithm-expression: ds_${user_id.intdiv(4194304) % 4}
 
 props:
   sql-show: true    # 打印路由后的真实 SQL(教学:看到每句 SQL 去了哪个库)
